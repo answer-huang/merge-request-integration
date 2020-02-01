@@ -21,10 +21,11 @@ open class ServiceBase : PersistentStateComponent<Element> {
             item.setAttribute("id", it.id)
             item.setAttribute("providerId", it.info.id)
             item.setAttribute("url", it.credentials.url)
-            item.setAttribute("login", it.credentials.url)
+            item.setAttribute("login", it.credentials.login)
             item.setAttribute("projectId", it.credentials.projectId)
             item.setAttribute("version", it.credentials.version)
             item.setAttribute("info", it.credentials.info)
+            item.setAttribute("ignoreSSLCertificateErrors", if (it.credentials.ignoreSSLCertificateErrors) "1" else "0")
             item.setAttribute("repository", it.repository)
             element.addContent(item)
         }
@@ -47,11 +48,12 @@ open class ServiceBase : PersistentStateComponent<Element> {
                 token = "",
                 projectId = item.getAttribute("projectId").value,
                 version = item.getAttribute("version").value,
-                info = item.getAttribute("info").value
+                info = item.getAttribute("info").value,
+                ignoreSSLCertificateErrors = shouldIgnoreSSLCertificateErrors(item)
             )
             val id = item.getAttribute("id").value
             myProvidersData[id] = ProviderSettingsImpl(
-                id = id,
+                id = id.trim(),
                 info = info,
                 credentials = decryptCredentials(info, credentials),
                 repository = item.getAttribute("repository").value
@@ -59,26 +61,46 @@ open class ServiceBase : PersistentStateComponent<Element> {
         }
     }
 
+    private fun shouldIgnoreSSLCertificateErrors(item: Element): Boolean {
+        val attribute = item.getAttribute("ignoreSSLCertificateErrors")
+        if (null === attribute) {
+            return false
+        }
+        return attribute.value == "1" || attribute.value.toLowerCase() == "true"
+    }
+
     protected fun encryptCredentials(info: ProviderInfo, credentials: ApiCredentials): ApiCredentials {
         encryptPassword(info, credentials, credentials.token)
         return ApiCredentialsImpl(
             url = credentials.url,
-            login = "",
-            token = "",
+            // -----------------------------------------------------------------
+            // Always bind login and token because if we don't the token will be
+            // empty if the state not stored to the storage yet.
+            // It's safe because the secret is stored on memory only.
+            login = credentials.login,
+            token = credentials.token,
+            // -----------------------------------------------------------------
             projectId = credentials.projectId,
             version = credentials.version,
-            info = credentials.info
+            info = credentials.info,
+            ignoreSSLCertificateErrors = credentials.ignoreSSLCertificateErrors
         )
     }
 
     protected fun decryptCredentials(info: ProviderInfo, credentials: ApiCredentials): ApiCredentials {
         return ApiCredentialsImpl(
             url = credentials.url,
-            login = "",
-            token = decryptPassword(info, credentials) ?: "",
+            // -----------------------------------------------------------------
+            // Always bind login and token because if we don't the token will be
+            // empty if the state not stored to the storage yet.
+            // It's safe because the secret is stored on memory only.
+            login = credentials.login,
+            token = decryptPassword(info, credentials) ?: credentials.token,
+            // -----------------------------------------------------------------
             projectId = credentials.projectId,
             version = credentials.version,
-            info = credentials.info
+            info = credentials.info,
+            ignoreSSLCertificateErrors = credentials.ignoreSSLCertificateErrors
         )
     }
 

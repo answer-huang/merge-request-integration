@@ -3,10 +3,12 @@ package net.ntworld.mergeRequestIntegration
 import net.ntworld.foundation.Infrastructure
 import net.ntworld.mergeRequest.*
 import net.ntworld.mergeRequest.api.ApiCredentials
+import net.ntworld.mergeRequest.api.ApiOptions
 import net.ntworld.mergeRequest.api.ApiProvider
 import net.ntworld.mergeRequestIntegration.internal.ProjectImpl
 import net.ntworld.mergeRequestIntegration.internal.ProviderDataImpl
 import net.ntworld.mergeRequestIntegration.internal.UserImpl
+import net.ntworld.mergeRequestIntegration.provider.MemoryCache
 import net.ntworld.mergeRequestIntegration.provider.gitlab.Gitlab
 import net.ntworld.mergeRequestIntegration.provider.gitlab.GitlabApiProvider
 
@@ -16,6 +18,10 @@ object ApiProviderManager {
 
     val providerDataCollection
         get() = data.values.toList()
+
+    fun updateApiOptions(options: ApiOptions) {
+        api.forEach { it.value.setOptions(options) }
+    }
 
     fun register(
         infrastructure: Infrastructure,
@@ -71,7 +77,11 @@ object ApiProviderManager {
         credentials: ApiCredentials
     ): ApiProvider {
         val created = when (info.id) {
-            Gitlab.id -> GitlabApiProvider(credentials = credentials, infrastructure = infrastructure)
+            Gitlab.id -> GitlabApiProvider(
+                credentials = credentials,
+                infrastructure = infrastructure,
+                cache = MemoryCache()
+            )
             else -> throw Exception("Cannot create ApiProvider ${info.id}")
         }
         api[id] = created
@@ -82,7 +92,7 @@ object ApiProviderManager {
         return Pair(findDataOrFail(id), findProviderOrFail(id))
     }
 
-    fun findDataOrFail(id: String): ProviderData {
+    private fun findDataOrFail(id: String): ProviderData {
         val data = data[id]
         return if (null !== data) {
             data
@@ -91,7 +101,7 @@ object ApiProviderManager {
         }
     }
 
-    fun findProviderOrFail(id: String): ApiProvider {
+    private fun findProviderOrFail(id: String): ApiProvider {
         val provider = api[id]
         return if (null !== provider) {
             provider
